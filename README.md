@@ -1,4 +1,5 @@
 # Pokemon Battle Sim
+Battle against OpenAI's GPT-3 in a Pokemon Battle Simulation
 
 ## How to Install:
 * Clone the Repository
