@@ -190,7 +190,7 @@ def transition_screen():
     pygame.display.set_caption("Pokemon")
     img = pygame.image.load("red.gif")
 
-    # Create a pixelated version of the background image
+    # pixelated background
     pixelated_img = pygame.transform.scale(img, (160, 120))
     pixelated_img = pygame.transform.scale(pixelated_img, (800, 600)) 
     fade_surface = pygame.Surface((800, 600))
@@ -212,13 +212,12 @@ def transition_screen():
     time.sleep(3)
 
 def generate_ai_response(message):
-    # Call the OpenAI API to generate AI responses in parallel
     response = openai.Completion.create(
         engine="text-davinci-003",
         prompt=message,
-        max_tokens=30,  # Adjust the value to limit the response length
-        temperature=0.5,  # Adjust the value to control the randomness
-        n=3,  # Adjust the number of parallel completions
+        max_tokens=30,
+        temperature=0.2,  
+        n=3,
         stop=None,
         timeout=10,
     )
