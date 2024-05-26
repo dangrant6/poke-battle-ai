@@ -1,6 +1,7 @@
 import pygame
 from pygame.locals import *
-import openai
+import transformers
+from transformers import AutoModelForCausalLM, AutoTokenizer
 import random
 from dotenv import load_dotenv
 import os
@@ -9,7 +10,6 @@ import time
 
 load_dotenv()
 pygame.init()
-openai.api_key = os.getenv("KEY")
 
 width, height = 800, 600
 screen = pygame.display.set_mode((width, height))
@@ -69,20 +69,24 @@ class Pokemon:
         return poke_types.get(self.type, [])
     
 available_pokemon = [
-    Pokemon('Mewtwo', 'Psychic', 100, ['Psycho Cut', 'Close Combat', 'Psychic', 'Shadow Ball'], 'img\mewtwo.png'),
+    Pokemon('Mewtwo', 'Psychic', 100, ['Psycho Cut', 'Close Combat', 'Psychic', 'Shadow Ball'], r'img\mewtwo.png'),
     Pokemon('Tornadus', 'Flying', 100, ['Omnious Wind', 'Hurricane', 'Blackwind Storm', 'Air Slash'], 'img/tornadus.png'),
-    Pokemon('Moltres', 'Fire', 100, ['Flamethrower', 'Overheat', 'AncientPower', 'Heat Wave'], 'img\moltres.png'),
-    Pokemon('Lucario', 'Fighting', 100, ['Shadow Claw', 'Close Combat', 'Aura Sphere', 'Giga Impact'], 'img\lucario.png'),
-    Pokemon('Groudon', 'Ground', 100, ['Eruption', 'Crunch', 'Earthquake', 'Earth Power'], 'img\groudon.png'),
-    Pokemon('Kyogre', 'Water', 100, ['Hydro Pump', 'Water Spout', 'Muddy Water', 'Surf'], 'img\kyogre.png'),
-    Pokemon('Zapdos', 'Electric', 100, ['Thunder', 'Fly', 'Thunderbolt', 'Discharge'], 'img\zapdos.png'),
-    Pokemon('Giratina', 'Ghost', 100, ['Shadow Ball', 'Dark Pulse', 'Psychic', 'Earthquake'], 'img\giratina.png'),
+    Pokemon('Moltres', 'Fire', 100, ['Flamethrower', 'Overheat', 'AncientPower', 'Heat Wave'], r'img\moltres.png'),
+    Pokemon('Lucario', 'Fighting', 100, ['Shadow Claw', 'Close Combat', 'Aura Sphere', 'Giga Impact'], r'img\lucario.png'),
+    Pokemon('Groudon', 'Ground', 100, ['Eruption', 'Crunch', 'Earthquake', 'Earth Power'], r'img\groudon.png'),
+    Pokemon('Kyogre', 'Water', 100, ['Hydro Pump', 'Water Spout', 'Muddy Water', 'Surf'], r'img\kyogre.png'),
+    Pokemon('Zapdos', 'Electric', 100, ['Thunder', 'Fly', 'Thunderbolt', 'Discharge'], r'img\zapdos.png'),
+    Pokemon('Giratina', 'Ghost', 100, ['Shadow Ball', 'Dark Pulse', 'Psychic', 'Earthquake'], r'img\giratina.png'),
     Pokemon('Torterra', 'Grass', 100, ['Thunder', 'Solar Beam', 'Leaf Storm', 'Energy Ball'], 'img/torterra.png'),
     Pokemon('Articuno', 'Ice', 100, ['Ice Beam', 'Blizzard', 'Aerial Ace', 'Sky Attack'], 'img/articuno.png')
 ]
 
+# updated with model from huggingface for new use 
+tokenizer = AutoTokenizer.from_pretrained("gpt2")
+model = AutoModelForCausalLM.from_pretrained("gpt2")
+
 def draw_battle_scene(player_pokemon, ai_pokemon, moves):
-    img = pygame.image.load("img/bgd.png") 
+    img = pygame.image.load("img/bgd.png")
     img = pygame.transform.scale(img, (800, 600)) 
     screen.blit(img, (0, 0))
 
@@ -119,7 +123,7 @@ def draw_battle_scene(player_pokemon, ai_pokemon, moves):
 def draw_pokemon_selection(pokemon_list):
     screen.fill((255, 255, 255))
 
-    img = pygame.image.load("img\sel.jpg")
+    img = pygame.image.load("img/sel.jpg")
     img = pygame.transform.scale(img, (width, height))
     fade_surface = pygame.Surface((width, height))
     fade_surface.fill((0, 0, 0)) 
@@ -211,21 +215,20 @@ def transition_screen():
     pygame.display.flip()
     time.sleep(3)
 
+# updated with model from huggingface for new use since the previous openai model was deprecated
 def generate_ai_response(message):
-    response = openai.Completion.create(
-        engine="text-davinci-003",
-        prompt=message,
-        max_tokens=30,
-        temperature=0.2,  
-        n=3,
-        stop=None,
-        timeout=10,
+    inputs = tokenizer.encode(message, return_tensors='pt', add_special_tokens=True)
+    outputs = model.generate(
+        inputs, 
+        max_length=50, 
+        num_return_sequences=1, 
+        temperature=0.2, 
+        pad_token_id=tokenizer.eos_token_id
     )
-    choices = response.choices
-    return choices[0].text.strip()
+    ai_response = tokenizer.decode(outputs[0], skip_special_tokens=True)
+    return ai_response
 
 def battle(player_team, ai_team):
-    #pygame.mixer.music.play(-1)
     moves = player_team[0].moves
     player_move = None
     while True:
@@ -245,15 +248,9 @@ def battle(player_team, ai_team):
                     player_move = moves[3]
         if player_move:
             break
-    '''
-    player_message = f"The player's Pokemon uses '{player_move}'."
-    #ai_response = generate_ai_response(player_message)
-    '''
-    ai_move = random.choice(ai_team[0].moves)
-    '''
-    ai_message = f"The AI's Pokemon uses '{ai_move}'."
-    #ai_response = generate_ai_response(ai_message)
-    '''
+    
+    ai_move_prompt = f"Your opponent's {ai_team[0].name} (type {ai_team[0].type}) is facing your {player_team[0].name} (type {player_team[0].type}). Choose a move from {', '.join(ai_team[0].moves)}."
+    ai_move = generate_ai_response(ai_move_prompt)
 
     player_damage = random.randint(1, 6) * 35
     ai_damage = random.randint(1, 6) * 35
@@ -276,7 +273,6 @@ def battle(player_team, ai_team):
         print("It's super effective!")
 
     player_damage_message = f"Your Pokemon deals {player_damage} damage."
-    #ai_damage_response = generate_ai_response(player_damage_message)
 
     if player_team[0].is_fainted() and ai_team[0].is_fainted():
         print("It's a tie!")
@@ -342,8 +338,9 @@ while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
-    battle(player_team, ai_team)
-    if len(player_team) == 0 or len(ai_team) == 0:
+    if len(player_team) > 0 and len(ai_team) > 0:
+        battle(player_team, ai_team)
+    else:
         running = False
 pygame.quit()
 sys.exit()
